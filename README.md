@@ -31,8 +31,8 @@ Ein Bash-Script zum Backup wichtiger System- und Benutzerdaten unter Linux. Das 
 1. Repository klonen:
 
 ```bash
-git clone https://github.com/[username]/linux-backup-script.git
-cd linux-backup-script
+git clone https://github.com/root9191/backuplinux.git
+cd backuplinux
 ```
 
 2. Script ausführbar machen:
