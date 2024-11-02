@@ -31,6 +31,19 @@ LOG_FILE="${LOG_DIR}/backup.log"
 ERROR_LOG="${LOG_DIR}/backup_error.log"
 MAX_LOG_FILES=5           # Anzahl der zu behaltenden Log-Dateien
 
+# Benutzer-Home-Verzeichnis automatisch ermitteln und setzen
+if [ -n "${SUDO_USER:-}" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -z "$USER_HOME" ]; then
+        echo -e "${RED}Fehler: Konnte Home-Verzeichnis für $SUDO_USER nicht ermitteln${RESET}"
+        exit 1
+    fi
+    export USER_HOME
+else
+    echo -e "${RED}Fehler: SUDO_USER nicht gesetzt${RESET}"
+    exit 1
+fi
+
 # --- Backup Unterverzeichnisse ---
 declare -A BACKUP_SUBDIRS=(
     [etc]="$BASE_BACKUP_DIR/etc"
@@ -65,7 +78,8 @@ declare -a DOTFILES=(
     .bashrc
     .bash_profile
     .bash_history
-    .gitconfig
+    .nvidia-settings-rc
+    
     
     # Zusätzliche Shell-Konfigurationen (auskommentiert)
     #.zshenv
@@ -121,6 +135,7 @@ declare -a HOME_DIRS=(
     Dokumente
     Bilder
     Desktop
+    
 
     # Entwicklungstools (auskommentiert)
     #.gradle
@@ -349,23 +364,37 @@ log() {
     
     case "$level" in
         "ERROR")
-            echo -e "${formatted_timestamp} ${BOLD}${RED}ERROR:${RESET} $message" >&2
-            if [ "${LOG_ERRORS,,}" = "yes" ]; then
-                if [ ! -f "$ERROR_LOG" ]; then
-                    echo "=== Fehlerprotokoll gestartet am $(date) ===" > "$ERROR_LOG"
-                    chown "$SUDO_USER:$SUDO_USER" "$ERROR_LOG"
-                fi
-                local line_number=$(caller | cut -d" " -f1)
-                echo "$log_message (Zeile $line_number)" >> "$ERROR_LOG"
-            fi
-            return 1
-            ;;
+    # Terminal-Ausgabe für Fehler
+    echo -e "${formatted_timestamp} ${BOLD}${RED}ERROR:${RESET} $message" >&2
+    if [ "${LOG_ERRORS,,}" = "yes" ]; then
+        if [ ! -f "$ERROR_LOG" ]; then
+            echo "=== Fehlerprotokoll gestartet am $(date) ===" > "$ERROR_LOG"
+            chown "$SUDO_USER:$SUDO_USER" "$ERROR_LOG"
+        fi
+        local line_number=$(caller | cut -d" " -f1)
+        echo "$log_message (Zeile $line_number)" >> "$ERROR_LOG"
+        # Hervorhebung des Fehlers im Terminal
+      #  echo -e "\n${BOLD}${RED}Ein Fehler ist aufgetreten:${RESET}"
+        echo -e "${RED}$message${RESET}"
+        echo -e "${BOLD}${RED}Weitere Details im Fehlerprotokoll: ${ERROR_LOG}${RESET}\n" >&2
+    fi
+    return 1
+    ;;
         "WARNING")
             echo -e "${formatted_timestamp} ${BOLD}${YELLOW}WARNING:${RESET} $message"
             ;;
         "INFO")
             case "$message" in
-                *"Gefunden:"*)
+                    "Initialisiere Backup-Prozess"*|"Starte Backup-Prozess"*)
+                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                    ;;
+               *"Verschlüssele Backup"*)
+                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
+                    ;;
+               *"Benutzer-Home-Verzeichnis:"*)
+                     echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                    ;;
+               *"Gefunden:"*)
                     if [[ $message =~ Gefunden:\ ([0-9]+)\ (.*)\ und\ ([0-9]+)\ (.*) ]]; then
                         local num1="${BASH_REMATCH[1]}"
                         local text1="${BASH_REMATCH[2]}"
@@ -495,16 +524,52 @@ cleanup() {
     return $exit_code
 }
 
+# Im "Systemkonfigurationen sichern" Abschnitt und für die Home-Verzeichnisse:
 cp_with_error_handling() {
-    local source="${@: -2:1}"
-    local dest="${@: -1}"
+    local source="${@: -2:1}"  # Vorletztes Argument ist die Quelle
+    local dest="${@: -1}"      # Letztes Argument ist das Ziel
+    local error_output
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
     
     if [ ! -e "$source" ]; then
-        log_error "Datei/Verzeichnis nicht gefunden: $source (Zeile ${BASH_LINENO[0]})"
-        return 0
+        # Komplette Zeile in Rot
+        echo -e "${RED}[${timestamp}] ERROR: Datei/Verzeichnis nicht gefunden: $source${RESET}"
+        return 0  # Rückgabe 0, damit das Skript weiterläuft
     fi
-    cp "$@"
+
+    # Fehlerausgabe in Variable speichern
+    if ! error_output=$(cp "$@" 2>&1); then
+        echo -e "${RED}[${timestamp}] ERROR: Fehler beim Kopieren von $source nach $dest: $error_output${RESET}"
+        return 0  # Rückgabe 0, damit das Skript weiterläuft
+    fi
+    
+    return 0
 }
+
+# Für die Home-Verzeichnisse:
+#log_info "Sichere wichtige Verzeichnisse..."
+#for dir in "${HOME_DIRS[@]}"; do
+#    if [ -d "${USER_HOME}/${dir}" ]; then
+#        log_info "Sichere ${dir}..."
+#        cp_with_error_handling -r "${USER_HOME}/${dir}" "$BASE_BACKUP_DIR/"
+#    else
+#        # Fehlermeldung für nicht vorhandene Verzeichnisse
+#        timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+#        echo -e "${RED}[${timestamp}] ERROR: Verzeichnis nicht gefunden: ${USER_HOME}/${dir}${RESET}"
+#    fi
+#done
+
+
+# Optional: Eine zusätzliche Funktion für die Fehlerbehandlung der Hauptoperationen
+handle_operation_error() {
+    local operation="$1"
+    local target="$2"
+    local error_msg="$3"
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    
+    echo -e "${RED}[${timestamp}] ERROR: Fehler bei $operation von $target: $error_msg${RESET}"
+}
+
 
 kill_processes() {
     local dir="$1"
@@ -805,7 +870,7 @@ create_package_lists() {
     
     case "$DISTRO_NAME" in
     "arch"|"endeavouros"|"manjaro"|"cachyos"|"garuda")
-        # Alle installierten Pakete mit Zeitstempel
+        # Alle installierten Pakete mit Zeitstempel (nur für Referenz)
         log_info "Erstelle erweiterte Paketliste mit Installationsdaten..."
         expac --timefmt='%Y-%m-%d %T' '%l\t%n' | sort -r > "$backup_dir/all_packages_timestamps.txt" || {
             log_error "Fehler beim Erstellen der Paketliste (Zeile ${LINENO})"
@@ -813,25 +878,12 @@ create_package_lists() {
         }
         
         # Basis-Paketlisten erstellen
-        pacman -Qqen > "$temp_dir/pacman_temp.txt" || true
-        
         if [ "$USE_AUR" = true ] && [ -n "$AUR_HELPER" ]; then
+            # System-Pakete
+            pacman -Qqen > "$backup_dir/pacman_packages.txt" || true
+            
             # AUR-Pakete separat auflisten
-            sudo -u "$SUDO_USER" yay -Qqem > "$temp_dir/aur_temp.txt" || true
-            
-            # System-Pakete mit Zeitstempel
-            > "$backup_dir/pacman_packages.txt"  # Datei leeren/erstellen
-            while IFS= read -r pkg; do
-                # Exakter Match: Suche nach Zeitstempel, Tab, exakter Paketname
-                grep "^[0-9-]\{10\} [0-9:]\{8\}[[:space:]]${pkg}$" "$backup_dir/all_packages_timestamps.txt" >> "$backup_dir/pacman_packages.txt"
-            done < "$temp_dir/pacman_temp.txt"
-            
-            # AUR-Pakete mit Zeitstempel
-            > "$backup_dir/aur_packages.txt"  # Datei leeren/erstellen
-            while IFS= read -r pkg; do
-                # Exakter Match: Suche nach Zeitstempel, Tab, exakter Paketname
-                grep "^[0-9-]\{10\} [0-9:]\{8\}[[:space:]]${pkg}$" "$backup_dir/all_packages_timestamps.txt" >> "$backup_dir/aur_packages.txt"
-            done < "$temp_dir/aur_temp.txt"
+            sudo -u "$SUDO_USER" yay -Qqem > "$backup_dir/aur_packages.txt" || true
             
             # Zählen der Pakete
             local pacman_count=0
@@ -842,10 +894,7 @@ create_package_lists() {
             log_info "Gefunden: $pacman_count System-Pakete und $aur_count AUR-Pakete"
         else
             # Wenn kein AUR verwendet wird, nur System-Pakete speichern
-            > "$backup_dir/pacman_packages.txt"  # Datei leeren/erstellen
-            while IFS= read -r pkg; do
-                grep "[[:space:]]${pkg}\>" "$backup_dir/all_packages_timestamps.txt" >> "$backup_dir/pacman_packages.txt"
-            done < "$temp_dir/pacman_temp.txt"
+            pacman -Qqen > "$backup_dir/pacman_packages.txt" || true
             
             local package_count=0
             [ -f "$backup_dir/pacman_packages.txt" ] && package_count=$(wc -l < "$backup_dir/pacman_packages.txt" 2>/dev/null || echo 0)
@@ -1064,21 +1113,31 @@ backup_with_rsync() {
 }
 
 
+
 # ==============================================================================
 # TEIL 5: HAUPTLOGIK
 # ==============================================================================
 
+# --- PHASE 1: GRUNDLEGENDE CHECKS ---
 # Prüfen ob Script als root läuft
+# TEIL 5: HAUPTLOGIK
+
+# --- PHASE 1: GRUNDLEGENDE CHECKS ---
 if [ "$EUID" -ne 0 ]; then 
     echo "Dieses Script muss mit sudo-Rechten ausgeführt werden!"
     exit 1
 fi
 
+# --- PHASE 2: BENUTZER UND PARAMETER ---
 # Benutzer-Home-Verzeichnis setzen
 if [ -n "${SUDO_USER:-}" ]; then
-    USER_HOME=$(eval echo ~${SUDO_USER})
+    export USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -z "$USER_HOME" ]; then
+        echo -e "${RED}Fehler: Konnte Home-Verzeichnis für $SUDO_USER nicht ermitteln${RESET}"
+        exit 1
+    fi
 else
-    log_error "Fehler: SUDO_USER nicht gesetzt"
+    echo -e "${RED}Fehler: SUDO_USER nicht gesetzt${RESET}"
     exit 1
 fi
 
@@ -1091,7 +1150,6 @@ ENCRYPT=false
 CREATE_PW=false
 password_file="${USER_HOME}/.backup_password"
 
-# Parameter verarbeiten
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -zip)
@@ -1113,20 +1171,24 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-# --- Fortsetzung der Hauptlogik ---
-# Passwortdatei erstellen wenn gewünscht
 if [ "$CREATE_PW" = true ]; then
     create_password_file "$password_file"
+    echo "Passwortdatei wurde erstellt. Starten Sie das Backup erneut mit der Option -pw"
     exit 0
 fi
 
-# System-Erkennung und Konfiguration
+# --- PHASE 3: SYSTEM-ERKENNUNG UND ABHÄNGIGKEITEN ---
+log_info "Prüfe System und Abhängigkeiten..."
 detect_distro
-configure_package_manager
-check_base_dependencies
 detect_desktop_environment
+check_base_dependencies
+configure_package_manager
 
-# Backup-Pfad mit optionalem Zeitstempel generieren
+# --- PHASE 4: BACKUP VORBEREITUNG ---
+log_info "Initialisiere Backup-Prozess..."
+log_info "Benutzer-Home-Verzeichnis: $USER_HOME"
+
+# Backup-Pfad vorbereiten
 BASE_BACKUP_DIR=$(get_backup_path "$BASE_BACKUP_DIR")
 mkdir -p "$TEMP_BASE_DIR"
 
@@ -1136,10 +1198,16 @@ for dir in "${BACKUP_SUBDIRS[@]}"; do
     mkdir -p "$dir"
 done
 
-# Backup-Prozess durchführen
+# Paketlisten erstellen
+create_package_lists "$BASE_BACKUP_DIR"
+
+# --- PHASE 5: BACKUP DURCHFÜHRUNG ---
+log_info "Starte Backup-Prozess..."
+
+# Dann erst die eigentlichen Backup-Funktionen aufrufen
 backup_desktop_settings
 backup_ssh "$BASE_BACKUP_DIR"
-create_package_lists "$BASE_BACKUP_DIR"
+
 
 # Desktop-Environment spezifische Backups
 log_info "Sichere Desktop-Environment spezifische Einstellungen..."
@@ -1198,9 +1266,18 @@ done
 # Home-Verzeichnisse sichern
 log_info "Sichere wichtige Verzeichnisse..."
 for dir in "${HOME_DIRS[@]}"; do
-    if [ -d "${USER_HOME}/${dir}" ]; then
+    source="${USER_HOME}/${dir}"
+    target="$BASE_BACKUP_DIR/${dir}"
+    
+    if [ -d "$source" ]; then
         log_info "Sichere ${dir}..."
-        cp_with_error_handling -r "${USER_HOME}/${dir}" "$BASE_BACKUP_DIR/" 2>/dev/null || true
+        # Zielverzeichnis erstellen
+        mkdir -p "$target"
+        # Komplettes Verzeichnis mit Struktur kopieren
+        cp_with_error_handling -r "$source/." "$target/"
+    else
+        timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+        echo -e "${RED}[${timestamp}] ERROR: Verzeichnis nicht gefunden: $source${RESET}"
     fi
 done
 
