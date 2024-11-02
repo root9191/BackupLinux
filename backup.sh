@@ -20,13 +20,13 @@ BACKUP_SSH="no"           # "yes" oder "no"
 BACKUP_SSH_KEYS="no"      # "yes" oder "no" - Private Schlüssel nur wenn ENCRYPT="true"
 
 # --- Basis-Verzeichnisse ---
-BASE_BACKUP_DIR="/mnt/Daten/lichti/backup"
+BASE_BACKUP_DIR="/mnt/backup"
 TEMP_BASE_DIR="/var/tmp/bkp"
 
 # --- Logging Konfiguration ---
 LOG_TO_FILE="yes"          # "yes" oder "no" - Logging in Datei aktivieren
 LOG_ERRORS="yes"          # "yes" oder "no" - Separate Fehlerprotokollierung
-LOG_DIR="/home/lichti/Dokumente"
+LOG_DIR="/home/log/"
 LOG_FILE="${LOG_DIR}/backup.log"
 ERROR_LOG="${LOG_DIR}/backup_error.log"
 MAX_LOG_FILES=5           # Anzahl der zu behaltenden Log-Dateien
