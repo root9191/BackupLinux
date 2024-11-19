@@ -335,6 +335,7 @@ declare -a LOCAL_EXCLUDES=(
 # ==============================================================================
 
 # --- Logging Funktionen ---
+# --- Logging Funktionen ---
 init_logging() {
     if [ "${LOG_TO_FILE,,}" = "yes" ]; then
         # Logging-Verzeichnis erstellen falls nicht vorhanden
@@ -355,141 +356,164 @@ init_logging() {
     fi
 }
 
+cleanup_logs() {
+    local max_logs=5
+    local log_pattern="backup_*.log"
+    
+    cd "$LOG_DIR" || return
+    if [ -f "$LOG_FILE" ]; then
+        mv "$LOG_FILE" "${LOG_FILE%.log}_$(date +'%Y%m%d_%H%M%S').log"
+    fi
+    
+    ls -t $log_pattern 2>/dev/null | tail -n +$((max_logs + 1)) | xargs -r rm
+    
+    if [ -f "$ERROR_LOG" ]; then
+        mv "$ERROR_LOG" "${ERROR_LOG%.log}_$(date +'%Y%m%d_%H%M%S').log"
+    fi
+}
+
 log() {
     local level="$1"
     local message="$2"
     local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    local formatted_message
+
+    # Clean message for logfile (ohne ANSI Farben)
     local log_message="[$timestamp] $level: $message"
+
+    # Formatierte Timestamp für Terminal
     local formatted_timestamp="${CYAN}[${timestamp}]${RESET}"
     
+    # Terminal Ausgabe
     case "$level" in
         "ERROR")
-    # Terminal-Ausgabe für Fehler
-    echo -e "${formatted_timestamp} ${BOLD}${RED}ERROR:${RESET} $message" >&2
-    if [ "${LOG_ERRORS,,}" = "yes" ]; then
-        if [ ! -f "$ERROR_LOG" ]; then
-            echo "=== Fehlerprotokoll gestartet am $(date) ===" > "$ERROR_LOG"
-            chown "$SUDO_USER:$SUDO_USER" "$ERROR_LOG"
-        fi
-        local line_number=$(caller | cut -d" " -f1)
-        echo "$log_message (Zeile $line_number)" >> "$ERROR_LOG"
-        # Hervorhebung des Fehlers im Terminal
-      #  echo -e "\n${BOLD}${RED}Ein Fehler ist aufgetreten:${RESET}"
-        echo -e "${RED}$message${RESET}"
-        echo -e "${BOLD}${RED}Weitere Details im Fehlerprotokoll: ${ERROR_LOG}${RESET}\n" >&2
-    fi
-    return 1
-    ;;
+            formatted_message="${formatted_timestamp} ${BOLD}${RED}ERROR:${RESET} $message"
+            echo -e "$formatted_message" >&2
+            if [ "${LOG_ERRORS,,}" = "yes" ]; then
+                if [ ! -f "$ERROR_LOG" ]; then
+                    echo "=== Fehlerprotokoll gestartet am $(date) ===" > "$ERROR_LOG"
+                    chown "$SUDO_USER:$SUDO_USER" "$ERROR_LOG"
+                fi
+                local line_number=$(caller | cut -d" " -f1)
+                echo "[$timestamp] ERROR: $message (Zeile $line_number)" >> "$ERROR_LOG"
+            fi
+            return 1
+            ;;
         "WARNING")
-            echo -e "${formatted_timestamp} ${BOLD}${YELLOW}WARNING:${RESET} $message"
+            formatted_message="${formatted_timestamp} ${BOLD}${YELLOW}WARNING:${RESET} $message"
+            echo -e "$formatted_message"
             ;;
         "INFO")
             case "$message" in
-                    "Initialisiere Backup-Prozess"*|"Starte Backup-Prozess"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                "Initialisiere Backup-Prozess"*|"Starte Backup-Prozess"*)
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     ;;
-               *"Verschlüssele Backup"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
+                *"Verschlüssele Backup"*)
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
                     ;;
-               *"Benutzer-Home-Verzeichnis:"*)
-                     echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                *"Benutzer-Home-Verzeichnis:"*)
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     ;;
-               *"Gefunden:"*)
+                *"Gefunden:"*)
                     if [[ $message =~ Gefunden:\ ([0-9]+)\ (.*)\ und\ ([0-9]+)\ (.*) ]]; then
                         local num1="${BASH_REMATCH[1]}"
                         local text1="${BASH_REMATCH[2]}"
                         local num2="${BASH_REMATCH[3]}"
                         local text2="${BASH_REMATCH[4]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Gefunden: ${ORANGE}${num1}${GREEN} ${text1} und ${ORANGE}${num2}${GREEN} ${text2}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Gefunden: ${ORANGE}${num1}${GREEN} ${text1} und ${ORANGE}${num2}${GREEN} ${text2}${RESET}"
                     else
                         if [[ $message =~ Gefunden:\ ([0-9]+)\ (.*) ]]; then
                             local num="${BASH_REMATCH[1]}"
                             local text="${BASH_REMATCH[2]}"
-                            echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Gefunden: ${ORANGE}${num}${GREEN} ${text}${RESET}"
+                            formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Gefunden: ${ORANGE}${num}${GREEN} ${text}${RESET}"
                         else
-                            echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                            formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                         fi
                     fi
                     ;;
                 "Beginne mit der Komprimierung"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
                     ;;
                 *"Ursprungsgröße:"*)
                     if [[ $message =~ Ursprungsgröße:\ ([0-9A-Za-z]+B?) ]]; then
                         local size="${BASH_REMATCH[1]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Ursprungsgröße: ${ORANGE}${size}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Ursprungsgröße: ${ORANGE}${size}${RESET}"
                     else
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     fi
                     ;;
                 *"Starte Komprimierung mit"*)
                     if [[ $message =~ Starte\ Komprimierung\ mit\ ([0-9]+)\ (.*) ]]; then
                         local num="${BASH_REMATCH[1]}"
                         local text="${BASH_REMATCH[2]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}Starte Komprimierung mit ${ORANGE}${num}${BLUE} ${text}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}Starte Komprimierung mit ${ORANGE}${num}${BLUE} ${text}${RESET}"
                     else
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
                     fi
                     ;;
                 *"Komprimierte Größe:"*)
                     if [[ $message =~ Komprimierte\ Größe:\ ([0-9A-Za-z]+G?) ]]; then
                         local size="${BASH_REMATCH[1]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Komprimierte Größe: ${ORANGE}${size}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Komprimierte Größe: ${ORANGE}${size}${RESET}"
                     else
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     fi
                     ;;
                 "Räume auf"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     ;;
                 *"GPG ist installiert:"*)
                     if [[ $message =~ GPG\ ist\ installiert:\ gpg\ \(GnuPG\)\ ([0-9.]+) ]]; then
                         local version="${BASH_REMATCH[1]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${LIGHT_GREEN}GPG ist installiert: gpg (GnuPG) ${ORANGE}${version}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${LIGHT_GREEN}GPG ist installiert: gpg (GnuPG) ${ORANGE}${version}${RESET}"
                     else
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${LIGHT_GREEN}$message${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${LIGHT_GREEN}$message${RESET}"
                     fi
                     ;;
                 *"Backup-Größe:"*)
                     if [[ $message =~ Backup-Größe:\ ([0-9A-Za-z]+G?) ]]; then
                         local size="${BASH_REMATCH[1]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Backup-Größe: ${ORANGE}${size}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Backup-Größe: ${ORANGE}${size}${RESET}"
                     else
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     fi
                     ;;
                 *"Erkannt"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     ;;
                 *"Erstelle"*|*"Prüfe"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${DARK_GREEN}$message${RESET}"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${DARK_GREEN}$message${RESET}"
                     ;;
                 "Sichere"*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${BLUE}$message${RESET}"
                     ;;
                 "Alle Basis-Abhängigkeiten sind bereits installiert"*|*"Backup abgeschlossen."*)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${LIGHT_GREEN}$message${RESET}"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${LIGHT_GREEN}$message${RESET}"
                     ;;
                 *"Expac Version:"*)
                     if [[ $message =~ Expac\ Version:\ expac\ ([0-9]+) ]]; then
                         local version="${BASH_REMATCH[1]}"
-                        echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Expac Version: expac ${ORANGE}${version}${RESET}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Expac Version: expac ${ORANGE}${version}${RESET}"
                     fi
                     ;;
                 *)
-                    echo -e "${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} $message"
+                    formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} $message"
                     ;;
             esac
+            echo -e "$formatted_message"
             ;;
     esac
     
+    # Logfile Ausgabe ohne ANSI Farben
     [ "${LOG_TO_FILE,,}" = "yes" ] && echo "$log_message" >> "$LOG_FILE"
 }
 
-# --- Einfache Log-Wrapper ---
+# Vereinfachte Log-Wrapper (diese nur einmal aufrufen!)
 log_error() { log "ERROR" "$1"; }
 log_warning() { log "WARNING" "$1"; }
 log_info() { log "INFO" "$1"; }
+
+
 
 # --- Hilfsfunktionen ---
 cleanup_logs() {
