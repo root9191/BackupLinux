@@ -20,7 +20,7 @@ BACKUP_SSH="no"           # "yes" oder "no"
 BACKUP_SSH_KEYS="no"      # "yes" oder "no" - Private Schlüssel nur wenn ENCRYPT="true"
 
 # --- Basis-Verzeichnisse ---
-BASE_BACKUP_DIR="/mnt/Daten/lichti"
+BASE_BACKUP_DIR="/mnt/Daten/lichti/cachyos_ext"
 TEMP_BASE_DIR="/var/tmp/bkp"
 
 # --- Logging Konfiguration ---
