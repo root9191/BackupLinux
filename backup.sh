@@ -78,7 +78,7 @@ declare -a DOTFILES=(
     .bashrc
     .bash_profile
     .bash_history
-    .nvidia-settings-rc
+ #   .nvidia-settings-rc
     
     
     # Zusätzliche Shell-Konfigurationen (auskommentiert)
@@ -125,17 +125,17 @@ declare -a HOME_DIRS=(
     .thunderbird
     .mozilla
     .var
-    .vmware
-    .wine
+  #  .vmware
+   # .wine
     .icons
     .themes
-    .fonts
-    .docker
+  #  .fonts
+  #  .docker
     Downloads
     Dokumente
     Bilder
-    Desktop
-    
+   # Desktop
+    .config/BraveSoftware
 
     # Entwicklungstools (auskommentiert)
     #.gradle
@@ -163,7 +163,7 @@ declare -a SYSTEM_CONFIGS=(
     "fstab"
     "pacman.conf"
     "mkinitcpio.conf"
-    
+    default/grub
     # Basis-System (auskommentiert)
     #"hosts"
     #"hostname"
