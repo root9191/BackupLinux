@@ -189,6 +189,7 @@ declare -a SYSTEM_CONFIG_DIRS=(
     "conf.d"
     "default"
     "ufw"
+    "grub.d"
     
     # System (auskommentiert)
     #"xdg"
