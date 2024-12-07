@@ -77,7 +77,7 @@ declare -a DOTFILES=(
     .p10k.zsh
     .bashrc
     .bash_profile
-    .bash_history
+ #   .bash_history
  #   .nvidia-settings-rc
     
     
@@ -219,6 +219,14 @@ declare -a ICONS=(
     "Numix"
 )
 
+# --- Applications ---
+#/usr/share/applications
+declare -a APPLICATIONS=(
+    "*equibop*.desktop"
+)
+
+
+
 # --- RSYNC Ausschlüsse ---
 declare -a CACHE_EXCLUDES=(
     ".cache/yay"
@@ -229,6 +237,9 @@ declare -a CACHE_EXCLUDES=(
 #/home/$USER/.local
 declare -a LOCAL_EXCLUDES=(
     "share/Steam/steamapps/common"
+    "share/Steam/steamapps/compatdata"
+    "share/Steam/compatibilitytools.d"
+    "share/DaVinciResolve/DVIP/Cache"
     "share/Steam/ubuntu12_64"
     "share/Steam/steamapps/shadercache"
     "share/Trash"
@@ -1265,6 +1276,24 @@ for icon in "${ICONS[@]}"; do
     if [ -d "/usr/share/icons/$icon" ]; then
         log_info "Sichere Icon-Theme: $icon"
         cp_with_error_handling -r "/usr/share/icons/$icon" "${BACKUP_SUBDIRS[usr_share]}/icons/"
+    fi
+done
+
+
+# Applications sichern
+log_info "Sichere ausgewählte .desktop Dateien..."
+mkdir -p "${BACKUP_SUBDIRS[usr_share]}/applications"
+for app in "${APPLICATIONS[@]}"; do
+    found_files=$(find /usr/share/applications -name "$app" -type f)
+    if [ -n "$found_files" ]; then
+        file_count=$(echo "$found_files" | wc -l)
+        log_info "Gefunden: $file_count .desktop Dateien für Muster '$app'"
+        while IFS= read -r file; do
+            filename=$(basename "$file")
+            cp_with_error_handling "$file" "${BACKUP_SUBDIRS[usr_share]}/applications/"
+        done <<< "$found_files"
+    else
+        log_info "Keine .desktop Dateien gefunden für Muster: $app"
     fi
 done
 
