@@ -231,6 +231,7 @@ declare -a APPLICATIONS=(
 declare -a CACHE_EXCLUDES=(
     ".cache/yay"
     ".cache/mozilla"
+    ".cache/doc"
 )
 
 #Ausschlüsse aus dem Backup aus dem $User Home .local Verzeichnis
