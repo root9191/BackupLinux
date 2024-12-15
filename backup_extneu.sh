@@ -221,9 +221,9 @@ declare -a ICONS=(
 
 # --- Applications ---
 #/usr/share/applications
-declare -a APPLICATIONS=(
-    "*equibop*.desktop"
-)
+#declare -a APPLICATIONS=(
+    #"*equibop*.desktop"
+#)
 
 
 
@@ -1269,7 +1269,7 @@ log_info "Sichere NetworkManager-Konfigurationen..."
 cp_with_error_handling -r /etc/NetworkManager/system-connections "${BACKUP_SUBDIRS[etc]}/NetworkManager_system-connections"
 
 # /usr/share Verzeichnisse sichern
-log_info "Sichere /usr/share Verzeichnisse..."
+#log_info "Sichere /usr/share Verzeichnisse..."
 
 # Icons sichern
 mkdir -p "${BACKUP_SUBDIRS[usr_share]}/icons"
