@@ -1282,21 +1282,21 @@ done
 
 
 # Applications sichern
-log_info "Sichere ausgewählte .desktop Dateien..."
-mkdir -p "${BACKUP_SUBDIRS[usr_share]}/applications"
-for app in "${APPLICATIONS[@]}"; do
-    found_files=$(find /usr/share/applications -name "$app" -type f)
-    if [ -n "$found_files" ]; then
-        file_count=$(echo "$found_files" | wc -l)
-        log_info "Gefunden: $file_count .desktop Dateien für Muster '$app'"
-        while IFS= read -r file; do
-            filename=$(basename "$file")
-            cp_with_error_handling "$file" "${BACKUP_SUBDIRS[usr_share]}/applications/"
-        done <<< "$found_files"
-    else
-        log_info "Keine .desktop Dateien gefunden für Muster: $app"
-    fi
-done
+#log_info "Sichere ausgewählte .desktop Dateien..."
+#mkdir -p "${BACKUP_SUBDIRS[usr_share]}/applications"
+#for app in "${APPLICATIONS[@]}"; do
+#    found_files=$(find /usr/share/applications -name "$app" -type f)
+#    if [ -n "$found_files" ]; then
+#        file_count=$(echo "$found_files" | wc -l)
+#        log_info "Gefunden: $file_count .desktop Dateien für Muster '$app'"
+#        while IFS= read -r file; do
+#            filename=$(basename "$file")
+#            cp_with_error_handling "$file" "${BACKUP_SUBDIRS[usr_share]}/applications/"
+#        done <<< "$found_files"
+#    else
+#        log_info "Keine .desktop Dateien gefunden für Muster: $app"
+#    fi
+#done
 
 # Themes sichern
 if [ -d "/usr/share/themes" ]; then
