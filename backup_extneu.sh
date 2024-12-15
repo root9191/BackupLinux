@@ -26,7 +26,7 @@ TEMP_BASE_DIR="/var/tmp/bkp"
 # --- Logging Konfiguration ---
 LOG_TO_FILE="yes"          # "yes" oder "no" - Logging in Datei aktivieren
 LOG_ERRORS="yes"          # "yes" oder "no" - Separate Fehlerprotokollierung
-LOG_DIR="/home/log/"
+LOG_DIR="/mnt/bkplog/"
 LOG_FILE="${LOG_DIR}/backup.log"
 ERROR_LOG="${LOG_DIR}/backup_error.log"
 MAX_LOG_FILES=5           # Anzahl der zu behaltenden Log-Dateien
