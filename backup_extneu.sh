@@ -1385,3 +1385,4 @@ else
     log_info "Backup abgeschlossen. Dateien befinden sich in: $BASE_BACKUP_DIR"
     log_info "Backup-Größe: $backup_size"
 fi
+
