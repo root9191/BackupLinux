@@ -3,6 +3,11 @@
 # TEIL 1: KONFIGURIERBARE VARIABLEN UND EINSTELLUNGEN
 # ==============================================================================
 
+# Globaler Zähler am Anfang des Skripts
+BACKUP_COUNTER=0
+BACKUP_TOTAL=0
+# Globale Variable für Progress-Modus
+PROGRESS_MODE=false
 # Fehlerbehandlung aktivieren
 set -euo pipefail
 
@@ -62,27 +67,6 @@ MAGENTA='\e[35m'
 ORANGE='\e[38;5;208m'
 BOLD='\e[1m'
 RESET='\e[0m'
-
-
-# Copy file with a progress bar
-cpp() {
-    set -e
-    strace -q -ewrite cp -- "${1}" "${2}" 2>&1 |
-    awk '{
-        count += $NF
-        if (count % 10 == 0) {
-            percent = count / total_size * 100
-            printf "%3d%% [", percent
-            for (i=0;i<=percent;i++)
-                printf "="
-            printf ">"
-            for (i=percent;i<100;i++)
-                printf " "
-            printf "]\r"
-        }
-    }
-    END { print "" }' total_size="$(stat -c '%s' "${1}")" count=0
-}
 
 
 
@@ -536,10 +520,32 @@ log() {
                         formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Expac Version: expac ${ORANGE}${version}${RESET}"
                     fi
                     ;;
+                *"Backup umfasst"*)
+                    if [[ $message =~ Backup\ umfasst\ ([0-9]+)\ Elemente ]]; then
+                        local num="${BASH_REMATCH[1]}"
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}Backup umfasst ${ORANGE}${num}${GREEN} Elemente${RESET}"
+                    else
+                        formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
+                    fi
+                    ;;
                 *)
                     formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} $message"
                     ;;
             esac
+            if [ "$PROGRESS_MODE" = true ] && [ "$BACKUP_TOTAL" -gt 0 ]; then
+                local percent=$((BACKUP_COUNTER * 100 / BACKUP_TOTAL))
+                # Terminal-Breite ermitteln
+                local term_width=$(tput cols)
+                # Nachricht ohne ANSI-Codes für Längenberechnung
+                local clean_msg=$(echo -e "$formatted_message" | sed 's/\x1b\[[0-9;]*m//g')
+                local msg_length=${#clean_msg}
+                # Padding berechnen (Terminal-Breite minus Nachricht minus "[100%]")
+                local padding=$((term_width - msg_length - 7))
+                [ $padding -lt 1 ] && padding=1
+                # Spaces hinzufügen
+                local spaces=$(printf '%*s' $padding '')
+                formatted_message="${formatted_message}${spaces}${CYAN}[${percent}%]${RESET}"
+            fi
             echo -e "$formatted_message"
             ;;
     esac
@@ -588,27 +594,6 @@ cleanup() {
     return $exit_code
 }
 
-# Im "Systemkonfigurationen sichern" Abschnitt und für die Home-Verzeichnisse:
-cp_with_error_handling() {
-    local source="${@: -2:1}"  # Vorletztes Argument ist die Quelle
-    local dest="${@: -1}"      # Letztes Argument ist das Ziel
-    local error_output
-    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
-    
-    if [ ! -e "$source" ]; then
-        # Komplette Zeile in Rot
-        echo -e "${RED}[${timestamp}] ERROR: Datei/Verzeichnis nicht gefunden: $source${RESET}"
-        return 0  # Rückgabe 0, damit das Skript weiterläuft
-    fi
-
-    # Fehlerausgabe in Variable speichern
-    if ! error_output=$(cpp "$@" 2>&1); then
-        echo -e "${RED}[${timestamp}] ERROR: Fehler beim Kopieren von $source nach $dest: $error_output${RESET}"
-        return 0  # Rückgabe 0, damit das Skript weiterläuft
-    fi
-    
-    return 0
-}
 
 # Für die Home-Verzeichnisse:
 #log_info "Sichere wichtige Verzeichnisse..."
@@ -633,6 +618,30 @@ handle_operation_error() {
     
     echo -e "${RED}[${timestamp}] ERROR: Fehler bei $operation von $target: $error_msg${RESET}"
 }
+
+
+
+
+cp_with_error_handling() {
+    local source="${@: -2:1}"
+    local dest="${@: -1}"
+    local options=("${@:1:$#-2}")
+    
+    if [ ! -e "$source" ]; then
+        return 0
+    fi
+
+    if [ "$PROGRESS_MODE" = true ]; then
+        BACKUP_COUNTER=$((BACKUP_COUNTER + 1))
+    fi
+    
+    if cp "${options[@]}" "$source" "$dest" 2>/dev/null; then
+        return 0
+    else
+        return 0
+    fi
+}
+
 
 
 kill_processes() {
@@ -773,6 +782,12 @@ detect_desktop_environment() {
     export DE
 }
 
+# Vor dem Backup-Start alle Items zählen
+count_backup_items() {
+    BACKUP_TOTAL=$((${#DOTFILES[@]} + ${#HOME_DIRS[@]} + ${#SYSTEM_CONFIGS[@]} + ${#SYSTEM_CONFIG_DIRS[@]} + 10))
+    log_info "Backup umfasst $BACKUP_TOTAL Elemente"
+}
+
 configure_package_manager() {
     case "$DISTRO_NAME" in
         "arch"|"endeavouros"|"manjaro"|"cachyos"|"garuda")
@@ -862,6 +877,11 @@ check_base_dependencies() {
         log_info "GPG ist installiert: $gpg_version"
     fi
 }
+
+# Progress-Modus aktivieren
+PROGRESS_MODE=true
+echo ""  # Neue Zeile für Progress
+
 
 backup_ssh() {
     if [ "${BACKUP_SSH,,}" != "yes" ]; then
@@ -1247,6 +1267,7 @@ detect_distro
 detect_desktop_environment
 check_base_dependencies
 configure_package_manager
+count_backup_items  
 
 # --- PHASE 4: BACKUP VORBEREITUNG ---
 log_info "Initialisiere Backup-Prozess..."
@@ -1386,6 +1407,10 @@ for dir in "${PERSONAL_DIRS[@]}"; do
     fi
 done
 
+# Progress-Modus deaktivieren und Zeile abschließen
+PROGRESS_MODE=false
+echo ""  # Neue Zeile nach Progress
+
 # Backup abschließen
 if [ "$COMPRESS" = true ]; then
     log_info "Beginne mit der Komprimierung..."
@@ -1413,3 +1438,4 @@ else
     log_info "Backup-Größe: $backup_size"
 fi
 
+#echo ""
