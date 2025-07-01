@@ -125,6 +125,9 @@ declare -a HOME_DIRS=(
     .thunderbird
     .mozilla
     .var
+    AppImages
+    Musik
+    Videos
   #  .vmware
    # .wine
     .icons
@@ -163,7 +166,12 @@ declare -a SYSTEM_CONFIGS=(
     "fstab"
     "pacman.conf"
     "mkinitcpio.conf"
-    default/grub
+    #default/grub
+    default/limine
+    limine-entry-tool.conf
+    limine-snapper-sync.conf
+    limine-entry-tool.conf.pacnew
+    default/ufw
     # Basis-System (auskommentiert)
     #"hosts"
     #"hostname"
