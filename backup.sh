@@ -5,6 +5,7 @@
 
 # Fehlerbehandlung aktivieren
 set -euo pipefail
+PROGRESS_MODE=true
 
 # --- Backup Basis-Konfiguration ---
 USE_TIMESTAMP="no"  # "yes" oder "no"
@@ -616,6 +617,36 @@ handle_operation_error() {
 }
 
 
+
+
+cp_with_error_handling() {
+    local source="${@: -2:1}"
+    local dest="${@: -1}"
+    local options=("${@:1:$#-2}")
+    
+    if [ ! -e "$source" ]; then
+        return 0
+    fi
+    
+    if command -v cpg &> /dev/null; then
+        # Zuerst cpg -g versuchen
+        if cpg -g "${options[@]}" "$source" "$dest" 2>/dev/null; then
+            return 0
+        else
+            return 0
+        fi
+    else
+        # Fallback auf normales cp
+        if cp "${options[@]}" "$source" "$dest" 2>/dev/null; then
+            return 0
+        else
+            return 0
+        fi
+    fi
+}
+
+
+
 kill_processes() {
     local dir="$1"
     local pids
@@ -1150,7 +1181,7 @@ backup_with_rsync() {
     local excludes="${3:-}"
     
     if [ -d "$source" ]; then
-        local rsync_cmd="rsync -a $excludes \"$source\" \"$target\""
+        local rsync_cmd="rsync -a --progress $excludes \"$source\" \"$target\""
         eval $rsync_cmd
     else
         log_info "Verzeichnis $source existiert nicht, überspringe..."
