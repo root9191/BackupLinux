@@ -63,6 +63,29 @@ ORANGE='\e[38;5;208m'
 BOLD='\e[1m'
 RESET='\e[0m'
 
+
+# Copy file with a progress bar
+cpp() {
+    set -e
+    strace -q -ewrite cp -- "${1}" "${2}" 2>&1 |
+    awk '{
+        count += $NF
+        if (count % 10 == 0) {
+            percent = count / total_size * 100
+            printf "%3d%% [", percent
+            for (i=0;i<=percent;i++)
+                printf "="
+            printf ">"
+            for (i=percent;i<100;i++)
+                printf " "
+            printf "]\r"
+        }
+    }
+    END { print "" }' total_size="$(stat -c '%s' "${1}")" count=0
+}
+
+
+
 # ==============================================================================
 # TEIL 2: ZU SICHERNDE DATEIEN UND VERZEICHNISSE
 # ==============================================================================
@@ -125,6 +148,10 @@ declare -a HOME_DIRS=(
     .thunderbird
     .mozilla
     .var
+    AppImages
+    Musik
+    Videos
+
   #  .vmware
    # .wine
     .icons
@@ -575,7 +602,7 @@ cp_with_error_handling() {
     fi
 
     # Fehlerausgabe in Variable speichern
-    if ! error_output=$(cp "$@" 2>&1); then
+    if ! error_output=$(cpp "$@" 2>&1); then
         echo -e "${RED}[${timestamp}] ERROR: Fehler beim Kopieren von $source nach $dest: $error_output${RESET}"
         return 0  # Rückgabe 0, damit das Skript weiterläuft
     fi
