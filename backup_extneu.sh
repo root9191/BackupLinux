@@ -166,7 +166,12 @@ declare -a SYSTEM_CONFIGS=(
     "fstab"
     "pacman.conf"
     "mkinitcpio.conf"
-    default/grub
+    #default/grub
+    default/limine
+    limine-entry-tool.conf
+    limine-snapper-sync.conf
+    limine-entry-tool.conf.pacnew
+    default/ufw
     # Basis-System (auskommentiert)
     #"hosts"
     #"hostname"
@@ -192,7 +197,7 @@ declare -a SYSTEM_CONFIG_DIRS=(
     "conf.d"
     "default"
     "ufw"
-    "grub.d"
+   # "grub.d"
     
     # System (auskommentiert)
     #"xdg"
