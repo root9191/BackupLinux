@@ -225,6 +225,8 @@ declare -a SYSTEM_CONFIG_DIRS=(
 declare -a ICONS=(
     "Numix-Circle"
     "Numix"
+    "MacTahoe-dark"
+    "MacTahoe"
 )
 
 # --- Applications ---
