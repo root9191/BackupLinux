@@ -139,8 +139,7 @@ declare -a HOME_DIRS=(
     Bilder
    # Desktop
     .config/BraveSoftware
-    .local/share/umu
-    .local/share/gnome-boxes
+
     # Entwicklungstools (auskommentiert)
     #.gradle
     #.cargo
@@ -261,6 +260,8 @@ declare -a LOCAL_EXCLUDES=(
     "share/bottles/templates"
     "share/bottles/temp"
     "share/pnpm"
+    "share/umu"
+    "share/gnome-boxes"
 )
 
 # ==============================================================================
