@@ -139,7 +139,8 @@ declare -a HOME_DIRS=(
     Bilder
    # Desktop
     .config/BraveSoftware
-
+    .local/share/umu
+    .local/share/gnome-boxes
     # Entwicklungstools (auskommentiert)
     #.gradle
     #.cargo
