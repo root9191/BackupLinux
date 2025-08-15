@@ -886,7 +886,7 @@ backup_desktop_settings() {
     case "$DE" in
         *"gnome"*)
             log_info "Sichere GNOME-Einstellungen..."
-            cp_with_error_handling -r "${USER_HOME}/.local/share/gnome-shell/extensions/" "$BASE_BACKUP_DIR/gnome_extensions"
+            #cp_with_error_handling -r "${USER_HOME}/.local/share/gnome-shell/extensions/" "$BASE_BACKUP_DIR/gnome_extensions"
             sudo -u "$SUDO_USER" dconf dump / > "$BASE_BACKUP_DIR/gnome-settings-backup.dconf"
             
             # Tastenkürzel sichern
@@ -1197,6 +1197,7 @@ init_logging
 COMPRESS=false
 ENCRYPT=false
 CREATE_PW=false
+MINIMAL_BACKUP=false  # NEU
 password_file="${USER_HOME}/.backup_password"
 
 while [[ $# -gt 0 ]]; do
@@ -1211,9 +1212,12 @@ while [[ $# -gt 0 ]]; do
         -create-pw)
             CREATE_PW=true
             ;;
+        -minimal)  # NEU: Nur Pakete und GNOME Settings
+            MINIMAL_BACKUP=true
+            ;;
         *)
             echo "Unbekannte Option: $1"
-            echo "Verwendung: $0 [-zip] [-pw] [-create-pw]"
+            echo "Verwendung: $0 [-zip] [-pw] [-create-pw] [-minimal]"
             exit 1
             ;;
     esac
@@ -1252,6 +1256,25 @@ create_package_lists "$BASE_BACKUP_DIR"
 
 # --- PHASE 5: BACKUP DURCHFÜHRUNG ---
 log_info "Starte Backup-Prozess..."
+
+if [ "$MINIMAL_BACKUP" = true ]; then
+    # NUR Paketlisten und GNOME Settings
+    log_info "Minimales Backup: Nur Paketlisten und GNOME Settings"
+    
+    # Paketlisten erstellen
+    create_package_lists "$BASE_BACKUP_DIR"
+    detect_desktop_environment
+    backup_desktop_settings
+    #backup_gnome_settings
+    # GNOME Settings sichern
+    if [[ "$DE" == "gnome" ]]; then
+        backup_gnome_settings
+    fi
+    
+    log_info "Minimales Backup abgeschlossen: $BASE_BACKUP_DIR"
+    chown -R "$SUDO_USER:$SUDO_USER" "$BASE_BACKUP_DIR"
+    exit 0
+fi
 
 # Dann erst die eigentlichen Backup-Funktionen aufrufen
 backup_desktop_settings
