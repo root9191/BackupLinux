@@ -134,7 +134,7 @@ declare -a HOME_DIRS=(
     .themes
   #  .fonts
   #  .docker
-    Downloads
+    #Downloads
     Dokumente
     Bilder
    # Desktop
