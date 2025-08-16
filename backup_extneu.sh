@@ -503,10 +503,10 @@ log() {
                         formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     fi
                     ;;
-                *"Erkannt"*)
+                *"Erkannt"*|*"Minimales Backup abgeschlossen"*)
                     formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${GREEN}$message${RESET}"
                     ;;
-                *"Erstelle"*|*"Prüfe"*)
+                *"Erstelle"*|*"Prüfe"*|*"Minimales Backup:"*)
                     formatted_message="${formatted_timestamp} ${BOLD}${GREEN}INFO:${RESET} ${DARK_GREEN}$message${RESET}"
                     ;;
                 "Sichere"*)
@@ -1246,10 +1246,12 @@ BASE_BACKUP_DIR=$(get_backup_path "$BASE_BACKUP_DIR")
 mkdir -p "$TEMP_BASE_DIR"
 
 # Backup-Verzeichnisse erstellen
-log_info "Erstelle Backup-Verzeichnisse..."
-for dir in "${BACKUP_SUBDIRS[@]}"; do
-    mkdir -p "$dir"
-done
+if [ "$MINIMAL_BACKUP" != true ]; then
+    log_info "Erstelle Backup-Verzeichnisse..."
+    for dir in "${BACKUP_SUBDIRS[@]}"; do
+        mkdir -p "$dir"
+    done
+fi
 
 # Paketlisten erstellen
 create_package_lists "$BASE_BACKUP_DIR"
