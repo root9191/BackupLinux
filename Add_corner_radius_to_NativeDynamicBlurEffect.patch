@@ -1,0 +1,33 @@
+Subject: [PATCH] Add `corner_radius` to NativeDynamicBlurEffect
+---
+Index: src/effects/native_dynamic_gaussian_blur.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/effects/native_dynamic_gaussian_blur.js b/src/effects/native_dynamic_gaussian_blur.js
+--- a/src/effects/native_dynamic_gaussian_blur.js	(revision 7958c917d4de8688c02f6b5a93ee74b28490bddb)
++++ b/src/effects/native_dynamic_gaussian_blur.js	(date 1758523371899)
+@@ -16,7 +16,7 @@
+     }, class NativeDynamicBlurEffect extends Shell.BlurEffect {
+         constructor(params) {
+             const { unscaled_radius, brightness, ...parent_params } = params;
+-            super({ ...parent_params, mode: Shell.BlurMode.BACKGROUND });
++            super({ ...parent_params, mode: Shell.BlurMode.BACKGROUND, ...{ 'corner_radius': 50.0 } });
+ 
+             this._theme_context = St.ThemeContext.get_for_stage(global.stage);
+             this._theme_context.connectObject(
+@@ -40,4 +40,12 @@
+             this._unscaled_radius = value;
+             this.radius = value * this._theme_context.scale_factor;
+         }
++
++        get corner_radius() {
++            return this.get_property?.('corner_radius');
++        }
++
++        set corner_radius(value) {
++            this.set_property?.('corner_radius', value);
++        }
+     });
+\ No newline at end of file
